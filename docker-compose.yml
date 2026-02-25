@@ -6,7 +6,7 @@ services:
     container_name: akai
     ports:
       - "3000:8000"    # HTTP: http://5.78.148.49
-      - "8000:8000"  # WebSocket: ws://5.78.148.49:8000/ws/...
+      - "3001:8000"  # WebSocket: ws://5.78.148.49:8000/ws/...
     env_file:
       - .env
     volumes:
