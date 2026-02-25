@@ -6,7 +6,7 @@ FROM node:20-alpine AS frontend-builder
 WORKDIR /frontend
 
 COPY frontend-react/package*.json ./
-RUN npm ci --prefer-offline
+RUN npm install
 
 COPY frontend-react/ ./
 RUN npm run build
