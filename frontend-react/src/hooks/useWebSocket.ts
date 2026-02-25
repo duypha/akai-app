@@ -32,8 +32,8 @@ export function useWebSocket({ onMessage, onStatusChange }: UseWebSocketOptions)
     shouldReconnectRef.current = true;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname;
-    const wsUrl = `${protocol}//${host}:8000/ws/${sessionId}`;
+    const host = window.location.host; // includes port if non-standard
+    const wsUrl = `${protocol}//${host}/ws/${sessionId}`;
 
     onStatusChange('connecting');
 
