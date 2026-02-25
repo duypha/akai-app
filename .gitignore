@@ -28,3 +28,11 @@ Thumbs.db
 # Local data
 *.db
 *.sqlite
+
+# React
+frontend-react/node_modules/
+frontend-react/build/
+frontend-react/.env.local
+frontend-react/.env.development.local
+frontend-react/.env.test.local
+frontend-react/.env.production.local

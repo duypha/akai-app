@@ -1,0 +1,127 @@
+.panel {
+  background: #FFFFFF;
+  border-radius: 20px;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  border: 1px solid #EDE9E3;
+}
+
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: #FAF8F5;
+  font-family: var(--font-heading);
+  font-weight: 500;
+  font-size: 1.1rem;
+  color: #3D3D3D;
+  border-bottom: 1px solid #EDE9E3;
+}
+
+.btnClose {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+  color: #9A9A9A;
+  padding: 0 4px;
+  transition: color 0.2s;
+}
+
+.btnClose:hover {
+  color: #3D3D3D;
+}
+
+.panelContent {
+  padding: 16px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.solutionCard {
+  background: #FAF8F5;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.solutionCard:hover {
+  background: #E8E0D5;
+  border-color: #DDD5C8;
+}
+
+.solutionCard:last-child {
+  margin-bottom: 0;
+}
+
+.solutionTitle {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: #3D3D3D;
+  margin-bottom: 4px;
+}
+
+.solutionMeta {
+  font-size: 0.75rem;
+  color: #9A9A9A;
+}
+
+.solutionSteps {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #EDE9E3;
+}
+
+.solutionStep {
+  font-size: 0.8rem;
+  color: #6B6B6B;
+  padding: 6px 0;
+  padding-left: 20px;
+  position: relative;
+}
+
+.solutionStep::before {
+  content: attr(data-step);
+  position: absolute;
+  left: 0;
+  color: #9A9A9A;
+  font-size: 0.7rem;
+}
+
+.feedbackButtons {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+}
+
+.btnStep {
+  padding: 8px 16px;
+  font-size: 0.75rem;
+  border-radius: 20px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: all 0.2s;
+}
+
+.done {
+  background: #7A9A7A;
+  color: white;
+}
+
+.done:hover {
+  background: #6A8A6A;
+}
+
+.skip {
+  background: #EDE9E3;
+  color: #6B6B6B;
+}
+
+.skip:hover {
+  background: #DDD5C8;
+}

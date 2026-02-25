@@ -1,0 +1,12 @@
+.screenPreview {
+  margin-top: 24px;
+  background: #3D3D3D;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.06);
+}
+
+.video {
+  width: 100%;
+  display: block;
+}

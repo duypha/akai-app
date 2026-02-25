@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Nunito:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Nunito:wght@300;400;500;600;700&display=swap');
 @import './tokens.css';
 
 *, *::before, *::after {
@@ -18,8 +18,9 @@ body {
   font-size: var(--text-base);
   line-height: var(--leading-normal);
   color: var(--color-text-primary);
-  background-color: var(--color-bg-primary);
+  background: linear-gradient(180deg, var(--color-bg-primary) 0%, var(--color-bg-secondary) 100%);
   min-height: 100vh;
+  font-weight: 400;
 }
 
 #root {
@@ -129,17 +130,28 @@ textarea {
   animation: slideUp var(--transition-normal);
 }
 
-/* App Layout */
-.app-container {
+/* App Layout - matching original */
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 24px;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  background: var(--color-bg-primary);
+  gap: 24px;
 }
 
-.app-main {
-  flex: 1;
+.mainLayout {
   display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  gap: 20px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .mainLayout {
+    flex-direction: column;
+  }
+
+  .container {
+    padding: 20px 16px;
+  }
 }

@@ -1,73 +1,84 @@
-import React from 'react';
-import { MessageSquare, Monitor, Mic, Palette, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
 import styles from './WelcomeScreen.module.css';
 
 interface WelcomeScreenProps {
-  onStart: () => void;
+  onStartSession: () => void;
+  onJoinSession: (code: string) => void;
   isLoading: boolean;
+  error: string | null;
 }
 
-export function WelcomeScreen({ onStart, isLoading }: WelcomeScreenProps) {
-  const features = [
-    {
-      icon: <MessageSquare size={24} />,
-      title: 'Smart Chat',
-      description: 'Natural conversations with AI assistance'
-    },
-    {
-      icon: <Monitor size={24} />,
-      title: 'Screen Vision',
-      description: 'Share your screen for visual help'
-    },
-    {
-      icon: <Mic size={24} />,
-      title: 'Voice Input',
-      description: 'Speak naturally, get instant responses'
-    },
-    {
-      icon: <Palette size={24} />,
-      title: 'UI Analysis',
-      description: 'Get feedback on designs and interfaces'
+export function WelcomeScreen({ onStartSession, onJoinSession, isLoading, error }: WelcomeScreenProps) {
+  const [sessionCode, setSessionCode] = useState('');
+
+  const handleJoin = () => {
+    const code = sessionCode.trim();
+    if (code.length === 4) {
+      onJoinSession(code);
     }
-  ];
+  };
+
+  const handleCodeKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleJoin();
+    }
+  };
 
   return (
     <div className={styles.container}>
-      <div className={styles.content}>
-        <div className={styles.brand}>
-          <h1 className={styles.title}>Akai</h1>
-          <p className={styles.subtitle}>Your AI Assistant</p>
-        </div>
+      <header className={styles.header}>
+        <h1 className={styles.title}>Akai</h1>
+        <p className={styles.subtitle}>Your mindful AI companion</p>
+      </header>
 
-        <p className={styles.tagline}>
-          Chat, share your screen, and get help with anything.
-        </p>
+      <div className={styles.card}>
+        <h2 className={styles.cardTitle}>Start Support Session</h2>
 
-        <button
-          className={styles.startButton}
-          onClick={onStart}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <>
-              <Loader2 size={20} className={styles.spinner} />
-              Connecting...
-            </>
-          ) : (
-            'Start Conversation'
+        <div className={styles.sessionOptions}>
+          <button
+            className={styles.btnPrimary}
+            onClick={onStartSession}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <span className={styles.spinner} />
+                Creating...
+              </>
+            ) : (
+              'Start New Session'
+            )}
+          </button>
+
+          <div className={styles.divider}>or</div>
+
+          <div className={styles.codeEntry}>
+            <label htmlFor="session-code" className={styles.codeLabel}>
+              Enter Session Code:
+            </label>
+            <input
+              id="session-code"
+              type="text"
+              className={styles.codeInput}
+              placeholder="1234"
+              maxLength={4}
+              value={sessionCode}
+              onChange={(e) => setSessionCode(e.target.value.replace(/\D/g, ''))}
+              onKeyPress={handleCodeKeyPress}
+              disabled={isLoading}
+            />
+            <button
+              className={styles.btnSecondary}
+              onClick={handleJoin}
+              disabled={isLoading || sessionCode.length !== 4}
+            >
+              Join
+            </button>
+          </div>
+
+          {error && (
+            <p className={styles.error}>{error}</p>
           )}
-        </button>
-
-        <div className={styles.features}>
-          {features.map((feature, index) => (
-            <div key={index} className={styles.feature}>
-              <div className={styles.featureIcon}>{feature.icon}</div>
-              <div className={styles.featureText}>
-                <h3 className={styles.featureTitle}>{feature.title}</h3>
-                <p className={styles.featureDescription}>{feature.description}</p>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     </div>

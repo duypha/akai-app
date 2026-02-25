@@ -1,0 +1,32 @@
+# Node
+frontend-react/node_modules/
+frontend-react/build/
+frontend-react/.env*
+
+# Python
+backend/__pycache__/
+backend/**/*.pyc
+backend/**/__pycache__/
+backend/.env
+backend/data/
+
+# Git
+.git/
+.gitignore
+
+# Docs / misc
+docs/
+*.docx
+*.md
+Desktop/
+*.vbs
+*.bat
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.cursor/
+.claude/

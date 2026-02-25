@@ -7,8 +7,11 @@ websockets>=12.0
 # Anthropic Claude
 anthropic>=0.40.0
 
-# OpenAI (for Whisper STT)
+# OpenAI (for TTS)
 openai>=1.50.0
+
+# Deepgram (for STT - Nova-3)
+deepgram-sdk>=3.0.0
 
 # Audio processing
 pydub>=0.25.1

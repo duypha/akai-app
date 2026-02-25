@@ -6,30 +6,16 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 let mainWindow;
 let tray;
 
-// Window dimensions - sidebar style
-const WINDOW_WIDTH = 420;
+const WINDOW_WIDTH = 400;
 const WINDOW_MARGIN = 10;
 
 function createWindow() {
-  // Get primary display dimensions
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
-
-  // Position window on the right side of the screen
-  const windowHeight = screenHeight - (WINDOW_MARGIN * 2);
-  const xPosition = screenWidth - WINDOW_WIDTH - WINDOW_MARGIN;
-  const yPosition = WINDOW_MARGIN;
-
   mainWindow = new BrowserWindow({
-    width: WINDOW_WIDTH,
-    height: windowHeight,
-    x: xPosition,
-    y: yPosition,
+    width: 900,
+    height: 700,
     minWidth: 360,
     minHeight: 500,
-    maxWidth: 600,
     frame: true,
-    titleBarStyle: 'hiddenInset',
     backgroundColor: '#F5F1EB',
     alwaysOnTop: false,
     skipTaskbar: false,
@@ -261,7 +247,9 @@ app.on('window-all-closed', () => {
 
 // Clean up shortcuts on quit
 app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
+  if (app.isReady()) {
+    globalShortcut.unregisterAll();
+  }
 });
 
 // Prevent multiple instances

@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from dotenv import load_dotenv
@@ -65,19 +65,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files and templates
-app.mount("/static", StaticFiles(directory="../frontend/static"), name="static")
-templates = Jinja2Templates(directory="../frontend/templates")
+# Serve React build static files
+REACT_BUILD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend-react", "build")
+app.mount("/static", StaticFiles(directory=os.path.join(REACT_BUILD_DIR, "static")), name="static")
 
 
 # ============================================================================
 # REST API Endpoints
 # ============================================================================
 
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    """Serve the main web interface"""
-    return templates.TemplateResponse("index.html", {"request": request})
+@app.get("/")
+async def home():
+    """Serve the React frontend"""
+    return FileResponse(os.path.join(REACT_BUILD_DIR, "index.html"))
 
 
 @app.post("/api/session/create")
@@ -200,8 +200,9 @@ async def chat(
         session_manager.add_message(session_id, "user", message)
 
         # Process with or without screenshot
-        if screenshot:
+        if screenshot and screenshot.filename:
             image_data = await screenshot.read()
+            print(f"📸 Screenshot received: {len(image_data)} bytes, filename: {screenshot.filename}")
             image_base64 = base64.b64encode(image_data).decode('utf-8')
 
             response = await claude_service.analyze_screen(
@@ -210,6 +211,7 @@ async def chat(
                 conversation_history=conversation_history
             )
         else:
+            print(f"💬 Text-only chat (no screenshot)")
             response = await claude_service.chat(
                 message=message,
                 conversation_history=conversation_history
@@ -669,6 +671,16 @@ async def health_check():
             }
         }
     }
+
+
+# Catch-all: serve React index.html for any non-API routes (client-side routing)
+@app.get("/{full_path:path}")
+async def serve_react(full_path: str):
+    """Serve React app for all non-API routes"""
+    file_path = os.path.join(REACT_BUILD_DIR, full_path)
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+    return FileResponse(os.path.join(REACT_BUILD_DIR, "index.html"))
 
 
 if __name__ == "__main__":

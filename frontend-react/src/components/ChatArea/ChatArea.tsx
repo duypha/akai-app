@@ -10,9 +10,7 @@ interface ChatAreaProps {
 
 export function ChatArea({ messages, isLoading }: ChatAreaProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom on new messages
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -20,31 +18,21 @@ export function ChatArea({ messages, isLoading }: ChatAreaProps) {
   }, [messages]);
 
   return (
-    <div className={styles.container} ref={containerRef}>
-      <div className={styles.messagesWrapper}>
-        <div className={styles.messages}>
-          {messages.map((message, index) => (
-            <ChatMessage
-              key={message.id}
-              message={message}
-              showTimestamp={
-                // Show timestamp if it's the last message or if there's a gap
-                index === messages.length - 1 ||
-                messages[index + 1]?.role !== message.role
-              }
-            />
-          ))}
+    <div className={styles.chatContainer}>
+      <div className={styles.chatMessages}>
+        {messages.map((message) => (
+          <ChatMessage key={message.id} message={message} />
+        ))}
 
-          {isLoading && (
-            <div className={styles.typingIndicator}>
-              <div className={styles.dot} />
-              <div className={styles.dot} />
-              <div className={styles.dot} />
-            </div>
-          )}
+        {isLoading && (
+          <div className={styles.typingIndicator}>
+            <span className={styles.dot} />
+            <span className={styles.dot} />
+            <span className={styles.dot} />
+          </div>
+        )}
 
-          <div ref={scrollRef} />
-        </div>
+        <div ref={scrollRef} />
       </div>
     </div>
   );

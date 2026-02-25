@@ -1,6 +1,10 @@
-export { Header } from './Header/Header';
 export { ChatArea } from './ChatArea/ChatArea';
 export { ChatMessage } from './ChatMessage/ChatMessage';
-export { ChatInput } from './ChatInput/ChatInput';
-export { Sidebar } from './Sidebar/Sidebar';
 export { WelcomeScreen } from './WelcomeScreen/WelcomeScreen';
+export { SessionBar } from './SessionBar/SessionBar';
+export { Controls } from './Controls/Controls';
+export { ScreenPreview } from './ScreenPreview/ScreenPreview';
+export { FeatureSidebar } from './FeatureSidebar/FeatureSidebar';
+export { KBPanel } from './KBPanel/KBPanel';
+export { TaskPanel } from './TaskPanel/TaskPanel';
+export { TemplatePanel } from './TemplatePanel/TemplatePanel';
