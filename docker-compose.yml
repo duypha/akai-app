@@ -5,7 +5,7 @@ services:
     build: .
     container_name: akai
     ports:
-      - "80:8000"    # HTTP: http://5.78.148.49
+      - "3000:8000"    # HTTP: http://5.78.148.49
       - "8000:8000"  # WebSocket: ws://5.78.148.49:8000/ws/...
     env_file:
       - .env
