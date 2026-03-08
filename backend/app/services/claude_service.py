@@ -131,7 +131,7 @@ You'll be back online in a sec."""
             # Call Claude API
             response = self.client.messages.create(
                 model=self.vision_model,
-                max_tokens=512,
+                max_tokens=2048,
                 system=self.system_prompt,
                 messages=messages
             )
@@ -187,7 +187,7 @@ You'll be back online in a sec."""
             # Call Claude API
             response = self.client.messages.create(
                 model=self.model,
-                max_tokens=512,
+                max_tokens=2048,
                 system=self.system_prompt,
                 messages=messages
             )
@@ -360,7 +360,7 @@ Format your response as a numbered list of clear, specific steps."""
             # Call Claude API
             response = self.client.messages.create(
                 model=self.model,
-                max_tokens=512,
+                max_tokens=2048,
                 system=enhanced_prompt,
                 messages=messages
             )
@@ -458,7 +458,7 @@ Format your response as a numbered list of clear, specific steps."""
             # Call Claude API
             response = self.client.messages.create(
                 model=self.vision_model,
-                max_tokens=512,
+                max_tokens=2048,
                 system=enhanced_prompt,
                 messages=messages
             )

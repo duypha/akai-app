@@ -334,18 +334,60 @@ async def create_task_from_message(
     session_id: str = Form(...),
     message: str = Form(...)
 ):
-    """Auto-detect template from message and create a task plan"""
+    """Auto-detect template from message and create a task plan.
+    Falls back to AI-generated plan if no template matches."""
+    import json as json_module
+
+    # Try template detection first
     result = task_planner.create_from_message(session_id, message)
-    if not result:
+    if result:
+        return {
+            "matched": True,
+            "source": "template",
+            "template": result["template"],
+            "plan": result["plan"]
+        }
+
+    # Fallback: ask Claude to generate steps
+    planning_prompt = (
+        f"The user needs help with: {message}\n\n"
+        "Create a step-by-step troubleshooting plan. "
+        "Reply ONLY with a valid JSON array, no other text:\n"
+        '[{"title": "Step title", "description": "Specific action to take"}, ...]\n'
+        "Limit to 5-7 steps. Be specific and actionable."
+    )
+    try:
+        ai_result = await claude_service.chat(message=planning_prompt)
+        raw = ai_result.get("response", "").strip()
+
+        # Extract JSON array from the response
+        start = raw.find("[")
+        end = raw.rfind("]") + 1
+        if start == -1 or end == 0:
+            raise ValueError("No JSON array found in AI response")
+
+        steps = json_module.loads(raw[start:end])
+        if not isinstance(steps, list) or not steps:
+            raise ValueError("AI returned empty or invalid steps")
+
+        plan = task_planner.create_plan(
+            session_id=session_id,
+            title=f"Custom Plan: {message[:60]}",
+            description=message,
+            steps=steps
+        )
+        return {
+            "matched": True,
+            "source": "ai",
+            "template": None,
+            "plan": plan.to_dict()
+        }
+    except Exception as e:
+        print(f"AI plan generation failed: {e}")
         return {
             "matched": False,
-            "message": "No matching template found"
+            "message": "No matching template found and AI plan generation failed"
         }
-    return {
-        "matched": True,
-        "template": result["template"],
-        "plan": result["plan"]
-    }
 
 
 @app.get("/api/tasks/session/{session_id}")
@@ -460,13 +502,84 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             msg_type = data.get("type")
 
             if msg_type == "screen_share":
-                # Received screen frame
-                frame_data = data.get("frame")
-                user_message = data.get("message")
+                try:
+                    # Received screen frame
+                    frame_data = data.get("frame")
+                    user_message = data.get("message")
 
-                if frame_data and user_message:
-                    # Get context
-                    kb_context = knowledge_base.get_context_for_query(user_message)
+                    if frame_data and user_message:
+                        # Get context
+                        kb_context = knowledge_base.get_context_for_query(user_message)
+                        task_context = task_planner.get_context_for_session(session_id)
+
+                        # Send KB match event if solutions found
+                        if kb_context.get("has_matches"):
+                            await manager.send_message(session_id, {
+                                "type": "kb_match",
+                                "problems": kb_context.get("problems", []),
+                                "top_solutions": kb_context.get("top_solutions", [])
+                            })
+
+                        # Analyze screen with Claude and context
+                        response = await claude_service.analyze_screen_with_context(
+                            image_base64=frame_data,
+                            user_message=user_message,
+                            conversation_history=session_manager.get_session(session_id).get("messages", []),
+                            kb_context=kb_context,
+                            task_context=task_context
+                        )
+
+                        session_manager.add_message(session_id, "assistant", response["response"])
+
+                        await manager.send_message(session_id, {
+                            "type": "ai_response",
+                            "response": response["response"],
+                            "had_kb_context": response.get("had_kb_context", False),
+                            "had_task_context": response.get("had_task_context", False)
+                        })
+                except Exception as e:
+                    print(f"WebSocket screen_share error: {e}")
+                    await manager.send_message(session_id, {
+                        "type": "error",
+                        "message": "Failed to analyze screen. Please try again."
+                    })
+
+            elif msg_type == "voice":
+                try:
+                    # Received voice data (base64 encoded)
+                    audio_data = base64.b64decode(data.get("audio", ""))
+
+                    # Transcribe
+                    transcript = await speech_service.transcribe(audio_data)
+
+                    session_manager.add_message(session_id, "user", transcript)
+
+                    await manager.send_message(session_id, {
+                        "type": "transcript",
+                        "text": transcript
+                    })
+                except Exception as e:
+                    print(f"WebSocket voice error: {e}")
+                    await manager.send_message(session_id, {
+                        "type": "error",
+                        "message": "Failed to transcribe audio. Please try again."
+                    })
+
+            elif msg_type == "chat":
+                try:
+                    # Text chat message with KB and task context
+                    message = data.get("message")
+                    session = session_manager.get_session(session_id)
+
+                    session_manager.add_message(session_id, "user", message)
+
+                    # Search Knowledge Base for matching solutions
+                    kb_context = knowledge_base.get_context_for_query(message)
+
+                    # Check for matching task template
+                    template_match = task_planner.detect_template(message)
+
+                    # Get active task plan
                     task_context = task_planner.get_context_for_session(session_id)
 
                     # Send KB match event if solutions found
@@ -477,11 +590,17 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                             "top_solutions": kb_context.get("top_solutions", [])
                         })
 
-                    # Analyze screen with Claude and context
-                    response = await claude_service.analyze_screen_with_context(
-                        image_base64=frame_data,
-                        user_message=user_message,
-                        conversation_history=session_manager.get_session(session_id).get("messages", []),
+                    # Send template detected event if match found
+                    if template_match and not task_context.get("has_active_plan"):
+                        await manager.send_message(session_id, {
+                            "type": "template_detected",
+                            "template": template_match
+                        })
+
+                    # Call Claude with context
+                    response = await claude_service.chat_with_context(
+                        message=message,
+                        conversation_history=session.get("messages", []),
                         kb_context=kb_context,
                         task_context=task_context
                     )
@@ -494,138 +613,92 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                         "had_kb_context": response.get("had_kb_context", False),
                         "had_task_context": response.get("had_task_context", False)
                     })
-
-            elif msg_type == "voice":
-                # Received voice data (base64 encoded)
-                audio_data = base64.b64decode(data.get("audio", ""))
-
-                # Transcribe
-                transcript = await speech_service.transcribe(audio_data)
-
-                session_manager.add_message(session_id, "user", transcript)
-
-                await manager.send_message(session_id, {
-                    "type": "transcript",
-                    "text": transcript
-                })
-
-            elif msg_type == "chat":
-                # Text chat message with KB and task context
-                message = data.get("message")
-                session = session_manager.get_session(session_id)
-
-                session_manager.add_message(session_id, "user", message)
-
-                # Search Knowledge Base for matching solutions
-                kb_context = knowledge_base.get_context_for_query(message)
-
-                # Check for matching task template
-                template_match = task_planner.detect_template(message)
-
-                # Get active task plan
-                task_context = task_planner.get_context_for_session(session_id)
-
-                # Send KB match event if solutions found
-                if kb_context.get("has_matches"):
+                except Exception as e:
+                    print(f"WebSocket chat error: {e}")
                     await manager.send_message(session_id, {
-                        "type": "kb_match",
-                        "problems": kb_context.get("problems", []),
-                        "top_solutions": kb_context.get("top_solutions", [])
+                        "type": "error",
+                        "message": "Failed to process message. Please try again."
                     })
-
-                # Send template detected event if match found
-                if template_match and not task_context.get("has_active_plan"):
-                    await manager.send_message(session_id, {
-                        "type": "template_detected",
-                        "template": template_match
-                    })
-
-                # Call Claude with context
-                response = await claude_service.chat_with_context(
-                    message=message,
-                    conversation_history=session.get("messages", []),
-                    kb_context=kb_context,
-                    task_context=task_context
-                )
-
-                session_manager.add_message(session_id, "assistant", response["response"])
-
-                await manager.send_message(session_id, {
-                    "type": "ai_response",
-                    "response": response["response"],
-                    "had_kb_context": response.get("had_kb_context", False),
-                    "had_task_context": response.get("had_task_context", False)
-                })
 
             elif msg_type == "task_action":
-                # Handle task-related actions
-                action = data.get("action")
-                plan_id = data.get("plan_id")
-                step_id = data.get("step_id")
-                template_id = data.get("template_id")
+                try:
+                    # Handle task-related actions
+                    action = data.get("action")
+                    plan_id = data.get("plan_id")
+                    step_id = data.get("step_id")
+                    template_id = data.get("template_id")
 
-                if action == "create_from_template" and template_id:
-                    plan = task_planner.create_from_template(session_id, template_id)
-                    if plan:
-                        await manager.send_message(session_id, {
-                            "type": "task_created",
-                            "plan": plan.to_dict()
-                        })
+                    if action == "create_from_template" and template_id:
+                        plan = task_planner.create_from_template(session_id, template_id)
+                        if plan:
+                            await manager.send_message(session_id, {
+                                "type": "task_created",
+                                "plan": plan.to_dict()
+                            })
 
-                elif action == "start_plan" and plan_id:
-                    result = task_planner.start_plan(plan_id)
-                    if result:
-                        await manager.send_message(session_id, {
-                            "type": "task_started",
-                            "plan": result,
-                            "current_step": result.get("current_step")
-                        })
+                    elif action == "start_plan" and plan_id:
+                        result = task_planner.start_plan(plan_id)
+                        if result:
+                            await manager.send_message(session_id, {
+                                "type": "task_started",
+                                "plan": result,
+                                "current_step": result.get("current_step")
+                            })
 
-                elif action == "complete_step" and plan_id and step_id:
-                    result = task_planner.complete_step(plan_id, step_id)
-                    if result:
-                        await manager.send_message(session_id, {
-                            "type": "step_completed",
-                            "plan": result["plan"],
-                            "completed_step": result["completed_step"],
-                            "next_step": result.get("next_step"),
-                            "is_complete": result.get("is_complete", False)
-                        })
+                    elif action == "complete_step" and plan_id and step_id:
+                        result = task_planner.complete_step(plan_id, step_id)
+                        if result:
+                            await manager.send_message(session_id, {
+                                "type": "step_completed",
+                                "plan": result["plan"],
+                                "completed_step": result["completed_step"],
+                                "next_step": result.get("next_step"),
+                                "is_complete": result.get("is_complete", False)
+                            })
 
-                elif action == "fail_step" and plan_id and step_id:
-                    error_msg = data.get("error_message", "Step failed")
-                    result = task_planner.fail_step(plan_id, step_id, error_msg)
-                    if result:
-                        await manager.send_message(session_id, {
-                            "type": "step_failed",
-                            "plan": result["plan"],
-                            "failed_step": result["failed_step"],
-                            "error_message": error_msg
-                        })
+                    elif action == "fail_step" and plan_id and step_id:
+                        error_msg = data.get("error_message", "Step failed")
+                        result = task_planner.fail_step(plan_id, step_id, error_msg)
+                        if result:
+                            await manager.send_message(session_id, {
+                                "type": "step_failed",
+                                "plan": result["plan"],
+                                "failed_step": result["failed_step"],
+                                "error_message": error_msg
+                            })
 
-                elif action == "skip_step" and plan_id and step_id:
-                    result = task_planner.skip_step(plan_id, step_id)
-                    if result:
-                        await manager.send_message(session_id, {
-                            "type": "step_completed",
-                            "plan": result["plan"],
-                            "skipped_step": result["skipped_step"],
-                            "next_step": result.get("next_step"),
-                            "is_complete": result.get("is_complete", False)
-                        })
+                    elif action == "skip_step" and plan_id and step_id:
+                        result = task_planner.skip_step(plan_id, step_id)
+                        if result:
+                            await manager.send_message(session_id, {
+                                "type": "step_completed",
+                                "plan": result["plan"],
+                                "skipped_step": result["skipped_step"],
+                                "next_step": result.get("next_step"),
+                                "is_complete": result.get("is_complete", False)
+                            })
+                except Exception as e:
+                    print(f"WebSocket task_action error: {e}")
+                    await manager.send_message(session_id, {
+                        "type": "error",
+                        "message": "Failed to perform task action. Please try again."
+                    })
 
             elif msg_type == "kb_feedback":
-                # Record solution feedback
-                solution_id = data.get("solution_id")
-                success = data.get("success", False)
+                try:
+                    # Record solution feedback
+                    solution_id = data.get("solution_id")
+                    success = data.get("success", False)
 
-                if solution_id:
-                    knowledge_base.record_feedback(solution_id, success)
-                    await manager.send_message(session_id, {
-                        "type": "feedback_recorded",
-                        "solution_id": solution_id,
-                        "success": success
-                    })
+                    if solution_id:
+                        knowledge_base.record_feedback(solution_id, success)
+                        await manager.send_message(session_id, {
+                            "type": "feedback_recorded",
+                            "solution_id": solution_id,
+                            "success": success
+                        })
+                except Exception as e:
+                    print(f"WebSocket kb_feedback error: {e}")
 
             elif msg_type == "ping":
                 await manager.send_message(session_id, {"type": "pong"})
@@ -633,7 +706,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     except WebSocketDisconnect:
         manager.disconnect(session_id)
     except Exception as e:
-        print(f"WebSocket error: {e}")
+        print(f"WebSocket connection error: {e}")
         manager.disconnect(session_id)
 
 
@@ -658,7 +731,7 @@ async def health_check():
         "services": {
             "claude": {
                 "model": "claude-sonnet-4-20250514",
-                "max_tokens": 512
+                "max_tokens": 2048
             },
             "knowledge_base": {
                 "categories": len(knowledge_base.get_categories()),

@@ -44,6 +44,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     // Handle chat-related messages internally
     switch (data.type) {
       case 'ai_response':
+        setIsLoading(false);
         const responseChunks = data.response.split(/\n\n+/).filter((chunk: string) => chunk.trim());
         responseChunks.forEach((chunk: string, index: number) => {
           setTimeout(() => {
@@ -68,6 +69,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           status: 'sent'
         };
         setMessages(prev => [...prev, userMsg]);
+        break;
+      }
+
+      case 'error': {
+        setIsLoading(false);
+        const errorMsg: Message = {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: data.message || 'Something went wrong. Please try again.',
+          timestamp: new Date(),
+          status: 'error'
+        };
+        setMessages(prev => [...prev, errorMsg]);
         break;
       }
 
@@ -299,64 +313,37 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       role: 'user',
       content: content.trim(),
       timestamp: new Date(),
-      status: 'sending'
+      status: 'sent'
     };
 
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
 
-    try {
-      const formData = new FormData();
-      formData.append('message', content.trim());
-      formData.append('session_id', session.id);
-
-      const stream = screenStreamRef.current;
-      if (stream && stream.active) {
-        try {
-          const screenshot = await captureScreenshot();
-          if (screenshot && screenshot.size > 0) {
-            formData.append('screenshot', screenshot, 'screenshot.jpg');
-          }
-        } catch (e) {
-          console.warn('[Screen] Capture error:', e);
+    const stream = screenStreamRef.current;
+    if (stream && stream.active) {
+      try {
+        const screenshot = await captureScreenshot();
+        if (screenshot && screenshot.size > 0) {
+          // Convert blob to base64 and send as screen_share via WebSocket
+          const reader = new FileReader();
+          const base64 = await new Promise<string>((resolve, reject) => {
+            reader.onload = () => {
+              const result = reader.result as string;
+              resolve(result.split(',')[1]); // Strip data:image/jpeg;base64, prefix
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(screenshot);
+          });
+          wsSend({ type: 'screen_share', frame: base64, message: content.trim() });
+          return;
         }
+      } catch (e) {
+        console.warn('[Screen] Capture error:', e);
       }
-
-      const response = await fetch(`${API_BASE}/api/chat`, {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!response.ok) throw new Error('Failed to send message');
-
-      const data = await response.json();
-
-      setMessages(prev => prev.map(msg =>
-        msg.id === userMessage.id ? { ...msg, status: 'sent' } : msg
-      ));
-
-      const responseChunks = data.response.split(/\n\n+/).filter((chunk: string) => chunk.trim());
-      responseChunks.forEach((chunk: string, index: number) => {
-        setTimeout(() => {
-          const assistantMessage: Message = {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: chunk.trim(),
-            timestamp: new Date(),
-            status: 'sent'
-          };
-          setMessages(prev => [...prev, assistantMessage]);
-        }, index * 150);
-      });
-    } catch (err) {
-      setMessages(prev => prev.map(msg =>
-        msg.id === userMessage.id ? { ...msg, status: 'error' } : msg
-      ));
-      setError(err instanceof Error ? err.message : 'Failed to send message');
-    } finally {
-      setIsLoading(false);
     }
-  }, [session, captureScreenshot]);
+
+    wsSend({ type: 'chat', message: content.trim() });
+  }, [session, captureScreenshot, wsSend]);
 
   const addMessage = useCallback((message: Message) => {
     setMessages(prev => [...prev, message]);

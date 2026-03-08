@@ -1,7 +1,8 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { WSMessage, ConnectionStatus } from '../types';
 
-const RECONNECT_DELAY = 3000;
+const MAX_RETRIES = 5;
+const BASE_DELAY_MS = 1000;
 
 interface UseWebSocketOptions {
   onMessage: (data: WSMessage) => void;
@@ -13,6 +14,7 @@ export function useWebSocket({ onMessage, onStatusChange }: UseWebSocketOptions)
   const sessionIdRef = useRef<string | null>(null);
   const shouldReconnectRef = useRef(false);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryCountRef = useRef(0);
 
   const cleanup = useCallback(() => {
     shouldReconnectRef.current = false;
@@ -30,6 +32,7 @@ export function useWebSocket({ onMessage, onStatusChange }: UseWebSocketOptions)
     cleanup();
     sessionIdRef.current = sessionId;
     shouldReconnectRef.current = true;
+    retryCountRef.current = 0;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host; // includes port if non-standard
@@ -37,38 +40,54 @@ export function useWebSocket({ onMessage, onStatusChange }: UseWebSocketOptions)
 
     onStatusChange('connecting');
 
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    const doConnect = (url: string) => {
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
 
-    ws.onopen = () => {
-      onStatusChange('connected');
-    };
+      ws.onopen = () => {
+        retryCountRef.current = 0;
+        onStatusChange('connected');
+      };
 
-    ws.onclose = () => {
-      onStatusChange('disconnected');
-      wsRef.current = null;
+      ws.onclose = () => {
+        onStatusChange('disconnected');
+        wsRef.current = null;
 
-      if (shouldReconnectRef.current && sessionIdRef.current) {
-        reconnectTimerRef.current = setTimeout(() => {
-          if (shouldReconnectRef.current && sessionIdRef.current) {
-            connect(sessionIdRef.current);
+        if (shouldReconnectRef.current && sessionIdRef.current) {
+          const attempt = retryCountRef.current;
+          if (attempt >= MAX_RETRIES) {
+            console.warn('[WS] Max reconnect attempts reached, giving up.');
+            shouldReconnectRef.current = false;
+            return;
           }
-        }, RECONNECT_DELAY);
-      }
+
+          const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+          retryCountRef.current = attempt + 1;
+          console.log(`[WS] Reconnecting in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})...`);
+
+          reconnectTimerRef.current = setTimeout(() => {
+            if (shouldReconnectRef.current && sessionIdRef.current) {
+              doConnect(`${protocol}//${sessionIdRef.current ? host : ''}/ws/${sessionIdRef.current}`);
+            }
+          }, delay);
+        }
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data) as WSMessage;
+          onMessage(data);
+        } catch (e) {
+          console.error('[WS] Failed to parse message:', e);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('[WS] Error:', error);
+      };
     };
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data) as WSMessage;
-        onMessage(data);
-      } catch (e) {
-        console.error('[WS] Failed to parse message:', e);
-      }
-    };
-
-    ws.onerror = (error) => {
-      console.error('[WS] Error:', error);
-    };
+    doConnect(wsUrl);
   }, [cleanup, onMessage, onStatusChange]);
 
   const send = useCallback((data: Record<string, unknown>) => {
@@ -80,6 +99,7 @@ export function useWebSocket({ onMessage, onStatusChange }: UseWebSocketOptions)
   const disconnect = useCallback(() => {
     cleanup();
     sessionIdRef.current = null;
+    retryCountRef.current = 0;
     onStatusChange('disconnected');
   }, [cleanup, onStatusChange]);
 

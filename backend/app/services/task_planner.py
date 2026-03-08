@@ -9,6 +9,8 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 
+from app.services.database import db
+
 
 class StepStatus(Enum):
     PENDING = "pending"
@@ -485,6 +487,7 @@ class TaskPlanner:
             plan.steps.append(step)
 
         self.plans[plan_id] = plan
+        db.save_task_plan(plan.to_dict())
         return plan
 
     def create_from_template(self, session_id: str, template_id: str) -> Optional[TaskPlan]:
@@ -568,6 +571,7 @@ class TaskPlanner:
             plan.steps[0].status = StepStatus.IN_PROGRESS
             plan.steps[0].started_at = datetime.now().isoformat()
 
+        db.save_task_plan(plan.to_dict())
         return plan.to_dict()
 
     def complete_step(self, plan_id: str, step_id: str) -> Optional[Dict[str, Any]]:
@@ -607,6 +611,7 @@ class TaskPlanner:
             plan.status = PlanStatus.COMPLETED
             plan.completed_at = datetime.now().isoformat()
 
+        db.save_task_plan(plan.to_dict())
         return {
             "plan": plan.to_dict(),
             "completed_step": step.to_dict(),
@@ -641,6 +646,7 @@ class TaskPlanner:
         # Optionally mark plan as failed (or could continue with next step)
         plan.status = PlanStatus.FAILED
 
+        db.save_task_plan(plan.to_dict())
         return {
             "plan": plan.to_dict(),
             "failed_step": step.to_dict()
@@ -683,6 +689,7 @@ class TaskPlanner:
             plan.status = PlanStatus.COMPLETED
             plan.completed_at = datetime.now().isoformat()
 
+        db.save_task_plan(plan.to_dict())
         return {
             "plan": plan.to_dict(),
             "skipped_step": step.to_dict(),

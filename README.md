@@ -5,11 +5,13 @@ Your friendly AI buddy that can see your screen and help with anything.
 ## Overview
 
 Akai is an AI-powered screen assistant that can:
-- 🎤 Listen to users via voice
+- 🎤 Listen to users via voice (Deepgram Nova-3)
 - 📺 See user's screen through screen sharing
 - 🤖 Analyze problems using Claude Vision AI
 - 🔊 Respond with voice and text
 - 💬 Have natural conversations about IT issues
+- 📋 Guide users through step-by-step task plans
+- 🗂️ Search a curated IT knowledge base
 
 ## Quick Start
 
@@ -30,7 +32,8 @@ cp .env.example .env
 
 Edit `.env` and add:
 - `ANTHROPIC_API_KEY` - Get from https://console.anthropic.com/
-- `OPENAI_API_KEY` - Get from https://platform.openai.com/
+- `DEEPGRAM_API_KEY` - Get from https://console.deepgram.com/ (required for voice input)
+- `OPENAI_API_KEY` - Get from https://platform.openai.com/ (optional, for voice output)
 
 ### 3. Run the Server
 
@@ -43,36 +46,48 @@ python run.py
 
 Go to: http://localhost:8000
 
-## Features (Phase 1)
+## Features
 
 - ✅ Session management with short codes
-- ✅ Text chat with Claude AI
+- ✅ Text chat with Claude AI (context-aware)
 - ✅ Screen sharing via WebRTC
-- ✅ Screenshot capture and analysis
-- ✅ Voice input (Whisper STT)
+- ✅ Screenshot capture and analysis (Claude Vision)
+- ✅ Voice input (Deepgram Nova-3 STT)
 - ✅ Voice output (OpenAI TTS)
 - ✅ Real-time WebSocket communication
+- ✅ Knowledge Base (20+ IT problems, 50+ solutions)
+- ✅ Task Planner (16 templates for common IT fixes)
+- ✅ Solution feedback tracking
 
 ## Project Structure
 
 ```
-it-support-agent/
+akai-app/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py           # FastAPI application
+│   │   ├── main.py                  # FastAPI application
 │   │   └── services/
 │   │       ├── claude_service.py    # Claude Vision & Chat
-│   │       ├── speech_service.py    # Whisper STT & TTS
-│   │       └── session_manager.py   # Session handling
+│   │       ├── speech_service.py    # Deepgram STT & OpenAI TTS
+│   │       ├── session_manager.py   # Session handling
+│   │       ├── knowledge_base.py    # IT problem/solution database
+│   │       ├── task_planner.py      # Step-by-step task plans
+│   │       └── database.py          # SQLite persistence
+│   ├── tests/
+│   │   ├── test_knowledge_base.py
+│   │   ├── test_task_planner.py
+│   │   └── test_session_manager.py
 │   ├── requirements.txt
 │   ├── run.py
 │   └── .env
-├── frontend/
-│   ├── templates/
-│   │   └── index.html
-│   └── static/
-│       ├── css/style.css
-│       └── js/app.js
+├── frontend-react/
+│   ├── src/
+│   │   ├── App.tsx
+│   │   ├── components/
+│   │   ├── contexts/
+│   │   └── hooks/
+│   ├── public/
+│   └── package.json
 └── README.md
 ```
 
@@ -87,7 +102,14 @@ it-support-agent/
 | `/api/screen/analyze` | POST | Analyze screenshot |
 | `/api/voice/transcribe` | POST | Speech to text |
 | `/api/voice/synthesize` | POST | Text to speech |
+| `/api/knowledge/search` | GET | Search knowledge base |
+| `/api/knowledge/solutions/{id}/feedback` | POST | Record solution feedback |
+| `/api/tasks/templates` | GET | List task templates |
+| `/api/tasks/create-from-message` | POST | Auto-detect and create task plan |
+| `/api/tasks/{plan_id}/start` | POST | Start a task plan |
+| `/api/tasks/{plan_id}/steps/{step_id}/complete` | POST | Complete a step |
 | `/ws/{session_id}` | WS | Real-time communication |
+| `/health` | GET | Service health check |
 
 ## Usage
 
@@ -95,10 +117,17 @@ it-support-agent/
 2. **Describe Your Problem**: Type or speak your issue
 3. **Share Screen**: Click "Share Screen" to let AI see your computer
 4. **Get Help**: AI will analyze and guide you step by step
+5. **Follow the Plan**: Use the task panel to tick off steps
+
+## Running Tests
+
+```bash
+cd backend
+pytest tests/ -v
+```
 
 ## Next Phases
 
-- **Phase 2**: Core AI improvements, task planning
 - **Phase 3**: Mouse/keyboard control, camera integration
 - **Phase 4**: Enterprise deployment, MDM support
 
